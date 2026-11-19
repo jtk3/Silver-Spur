@@ -4,7 +4,7 @@
   const storageKey = 'silver-spur-academy-v1';
   const names = {jacks:'Jacks or Better',deuces:'Deuces Wild',doubleDouble:'Double Double Bonus'};
   const format = value => Number(value).toFixed(4);
-  const defaults = () => ({mode:'guided',count:0,optimalEV:0,chosenEV:0,totalLoss:0,assisted:0,byVariant:{}});
+  const defaults = () => ({mode:'guided',count:0,optimalEV:0,chosenEV:0,totalLoss:0,assisted:0,byVariant:{},mistakes:[]});
   function restore() {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey));
@@ -114,11 +114,26 @@
     link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url),1000);
   });
+  $('academyDrill').addEventListener('click', () => {
+    const active = document.querySelector('#gamePicker button[aria-pressed="true"]')?.dataset.variant;
+    const matches = (stats.mistakes || []).filter(item => item.variant === active && item.loss > 1e-8);
+    if (!matches.length) {
+      $('academyFeedback').textContent = 'No economically costly mistakes recorded for this game yet.';
+      return;
+    }
+    matches.sort((a,b) => b.loss - a.loss);
+    const pool = matches.slice(0,Math.min(10,matches.length));
+    const pick = pool[Math.floor(Math.random()*pool.length)];
+    window.SilverSpurAcademyNextDeal = {variant:active,cards:pick.cards.slice()};
+    $('academyFeedback').textContent =
+      'Mistake drill queued for ' + names[active] + '. Finish any current hand, then press Deal to replay the five-card situation with a freshly randomized draw.';
+  });
   $('academyReset').addEventListener('click', () => {
     if (!confirm('Reset Academy grading statistics in this browser? Your Silver Spur game credits are unaffected.')) return;
     const mode = stats.mode;
     if (running) { running.terminate(); running = null; }
     pending.length = 0;
+    delete window.SilverSpurAcademyNextDeal;
     stats = defaults(); stats.mode = mode; save(); render();
     $('academyFeedback').textContent = 'Training statistics cleared.';
     $('academyAlternatives').hidden = true;
@@ -149,6 +164,12 @@
         stats.count++; stats.optimalEV += optimalEV; stats.chosenEV += chosenEV;
         stats.totalLoss += result.loss * bet;
         if (decision.assisted) stats.assisted++;
+        if (result.loss > 1e-8) {
+          stats.mistakes ||= [];
+          stats.mistakes.push({variant:decision.variant,cards:decision.cards.slice(),
+            loss:result.loss*bet,heldMask:decision.heldMask,bestMask:result.bestMasks[0]});
+          if (stats.mistakes.length > 100) stats.mistakes.shift();
+        }
         last = {result,bet,assisted:decision.assisted};
         save(); render();
         if (stats.mode === 'certification') $('academyFeedback').textContent =
