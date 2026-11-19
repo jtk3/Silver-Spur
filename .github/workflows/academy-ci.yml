@@ -19,3 +19,9 @@ jobs:
           node --check dist/math/poker-math.js
       - name: Exact expected-value test
         run: node --test math/academy-smoke.test.mjs
+      - name: Build exact custom paytable solver
+        run: c++ -O2 -std=c++17 math/custom-return.cpp -o /tmp/silver-spur-custom-return
+      - name: Verify conventional optimal return
+        run: |
+          /tmp/silver-spur-custom-return jacks | tee /tmp/jacks-return.txt
+          grep -q 'Optimal return: 99.5439' /tmp/jacks-return.txt
