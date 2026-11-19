@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#101528">
 <meta name="description" content="Play Jacks or Better, Deuces Wild, and Double Double Bonus in an original Las Vegas video poker cabinet. Each game returns 101% under perfect play.">
-<title>Silver Spur Poker</title>
+<title>Silver Spur Poker Academy</title>
 <link rel="icon" href="art/spur.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css?v=saved-hands">
+<link rel="stylesheet" href="style.css?v=saved-hands"><link rel="stylesheet" href="academy.css?v=1">
 <script defer src="math/calibration.js?v=3-games"></script><script defer src="math/poker-math.js?v=3-games"></script>
-<script defer src="sound.js"></script><script defer src="game.js?v=saved-hands"></script>
+<script defer src="sound.js"></script><script defer src="game.js?v=academy"></script><script defer src="academy.js?v=1"></script>
 </head>
 <body>
 <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -27,7 +27,7 @@
 <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4 10-9"/></symbol>
 </defs></svg>
 <header class="topbar"><div class="top-inner">
-<div class="wordmark"><svg class="brandstar" aria-hidden="true"><use href="#i-star"/></svg><span>Silver Spur</span><i></i><small>VIDEO POKER</small></div>
+<div class="wordmark"><svg class="brandstar" aria-hidden="true"><use href="#i-star"/></svg><span>Silver Spur</span><i></i><small>POKER ACADEMY</small></div>
 <nav aria-label="Game options"><button class="navbutton" id="sound" type="button"><svg class="ic"><use href="#i-speaker"/></svg><span>Sound on</span></button><button class="navbutton" id="guide" type="button"><svg class="ic"><use href="#i-book"/></svg><span>Game guide</span></button></nav>
 </div></header>
 <main>
@@ -41,7 +41,7 @@
 <button type="button" data-variant="deuces" aria-pressed="false">Deuces Wild</button>
 <button type="button" data-variant="doubleDouble" aria-pressed="false">Double Double Bonus</button>
 </nav>
-<div class="console-grid">
+<section class="academy-strip" aria-labelledby="academyTitle"><div><div class="eyebrow">STRATEGY LAB</div><h2 id="academyTitle">Economic accuracy trainer</h2><p>Every hold is scored by expected value, not by how often you match a particular strategy chart.</p></div><div class="academy-mode"><label for="academyMode">Training mode</label><select id="academyMode"><option value="guided">Guided</option><option value="practice">Practice</option><option value="certification">Certification</option></select></div></section><div class="console-grid">
 <section class="cabinet" aria-label="Poker machine">
 <div class="table-head">
 <div><div class="eyebrow"><span class="small-rule"></span> FIVE-CARD DRAW</div><h1 id="gameTitle">Jacks or Better</h1></div>
@@ -64,6 +64,7 @@
 <button class="pay-info" id="royalInfo"><svg class="ic"><use href="#i-info"/></svg><span id="royalInfoLabel">Royal flush bonus</span></button>
 </aside>
 </div>
+<section id="academyResults" class="academy-results" aria-label="Training performance"><div class="academy-numbers"><div><small>Economic accuracy</small><strong id="academyAccuracy">—</strong></div><div><small>Expected credits sacrificed</small><strong id="academyLoss">0.000</strong></div><div><small>Decisions graded</small><strong id="academyCount">0</strong></div></div><div id="academyFeedback" role="status" aria-live="polite">Deal a hand, select your hold, and press Draw to receive a grade.</div><div class="academy-actions"><button id="academyDetails" type="button">Last hand analysis</button><button id="academyReset" type="button">Reset training statistics</button></div><div id="academyAlternatives" hidden></div></section>
 <footer class="foot"><span class="play-credit"><svg class="ic"><use href="#i-chip"/></svg>Play credits only</span><span class="keys"><kbd>1–5</kbd> Hold cards <i></i><kbd>Space</kbd> Deal / draw</span><button class="session-link" id="session">Session stats <span aria-hidden="true">↗</span></button></footer>
 </div>
 </main>
