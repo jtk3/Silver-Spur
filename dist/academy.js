@@ -24,6 +24,12 @@
       'Certification mode: assistance is hidden; results remain concealed until you switch modes.';
   }
   function render() {
+    if (stats.mode === 'certification') {
+      $('academyAccuracy').textContent = 'Hidden';
+      $('academyLoss').textContent = 'Hidden';
+      $('academyCount').textContent = String(stats.count);
+      return;
+    }
     $('academyAccuracy').textContent = stats.optimalEV > 0
       ? (100 * stats.chosenEV / stats.optimalEV).toFixed(5) + '%' : '—';
     $('academyLoss').textContent = format(stats.totalLoss);
@@ -65,7 +71,7 @@
   }
   $('academyMode').addEventListener('change', e => {
     stats.mode = e.target.value;
-    save(); modeChanged();
+    save(); modeChanged(); render();
     if (stats.mode !== 'certification' && last) showAnalysis(last.result,last.bet,last.assisted);
     else if (stats.mode === 'certification') $('academyAlternatives').hidden = true;
   });
