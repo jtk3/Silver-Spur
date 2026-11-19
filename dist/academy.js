@@ -157,7 +157,7 @@
       {title:'Four to a natural royal',cards:[32,36,40,44,1]},
       {title:'Two aces and low connectors',cards:[48,49,0,5,10]},
       {title:'Open straight versus high cards',cards:[32,37,42,47,4]},
-      {title:'Four to a wheel straight flush',cards:[0,4,8,12,48]},
+      {title:'Four to a wheel straight flush',cards:[0,4,8,12,49]},
       {title:'Full house already dealt',cards:[48,49,50,44,45]}
     ],
     deuces:[
