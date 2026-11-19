@@ -270,6 +270,7 @@
       const mask = await activePoker().bestHold(state.cards);
       if (!canDraw() || state.seq !== seq || token !== hintSerial) return;
       if (await change(() => { state.holds=mask; })) {
+        window.dispatchEvent(new CustomEvent('silver-spur:hint', {detail:{variant:state.variant, cards:state.cards.slice()}}));
         message = mask === 0 ? 'Best play is to draw five new cards.' : 'Optimal hold set. Ready to draw.';
         SpurSound.hold(true);
       }
@@ -317,6 +318,7 @@
     SpurSound.wake();
     if (!canDraw() && state.credits===0) { showDialog('refill'); return; }
     let slots = [], paid = false;
+    const academyDecision = canDraw() ? {variant:state.variant,cards:state.cards.slice(),heldMask:state.holds,bet:state.paidBet} : null;
     cancelAnimationFrame(tallyFrame); busy=true; clearHint(); message='';
     try {
       const changed = await change(() => {
@@ -340,6 +342,8 @@
         }
       });
       if (!changed) { busy=false; render(); return; }
+      if (academyDecision) window.dispatchEvent(new CustomEvent('silver-spur:decision',{detail:academyDecision}));
+      else window.dispatchEvent(new CustomEvent('silver-spur:deal',{detail:{variant:state.variant,cards:state.cards.slice(),bet:state.paidBet}}));
       render(); reveal(slots,paid,state.seq);
     } catch { busy=false; message='Unable to deal. Please try again.'; render(); }
   }
