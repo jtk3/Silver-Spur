@@ -21,13 +21,13 @@ For each decision:
 
 All aggregate expected values account for the actual wager. This metric weights errors by their economic consequences. A tiny EV mistake matters far less than a large EV mistake. Multiple equally optimal holds receive full credit.
 
-The original game's Best Hold button counts as assistance. Certification mode hides that button and conceals decision feedback. To review performance, switch to practice or guided mode.
+The original game's Best Hold button counts as assistance. Guided mode shows Best Hold; Practice and Certification hide it. Practice shows feedback after each decision. Certification conceals feedback and aggregate accuracy until you switch modes. To review certification performance, switch to practice or guided mode.
 
 Training data is stored in browser localStorage under `silver-spur-academy-v1`; no account or server is required. The game state is separate from the original Silver Spur storage key. A reset control clears Academy results without touching game credits.
 
 ## Limitations and planned milestones
 
-This is an initial development build. It is **not yet** a full trainer with adaptive drills, permanent certification records, strategy explanations, custom paytables, additional poker variants, variance calculations, or exported analytics. These belong in subsequent development milestones.
+This is an initial development build. It records economically costly mistakes (up to 100) and can queue a previous five-card hand for a targeted replay, with a new randomized replacement draw. Per-game statistics and CSV export are available. It is **not yet** a full trainer with sequenced lessons, advanced strategy explanations, permanent certification records, custom paytables, additional poker variants, or variance calculations. These belong in subsequent development milestones.
 
 The EV computation uses exhaustive enumeration in a dedicated worker and may take several seconds on slow mobile devices. It is exact up to normal JavaScript floating-point rounding. The browser must load the app over HTTP(S), not from a bare `file://` URL, for worker support.
 
