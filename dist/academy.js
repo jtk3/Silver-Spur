@@ -61,7 +61,7 @@
       format(chosen*bet) + ' expected credits · Best: ' + format(best*bet) +
       ' · Expected loss: ' + format(loss*bet) + ' credits.' +
       (bestMasks.length > 1 ? ' Multiple optimal holds.' : '');
-    details.hidden = stats.mode === 'certification';
+    details.hidden = true;
   }
   $('academyMode').addEventListener('change', e => {
     stats.mode = e.target.value;
