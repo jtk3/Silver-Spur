@@ -1,0 +1,8 @@
+{
+  "deals": 2598960, "holdsPerDeal": 32, "drawDenominatorLcm": 7669695,
+  "standardReturnNumerator": 19555467691, "standardReturnDenominator": 19542382860,
+  "nonroyalWeightedSum": 19483122662124, "royalWeightedFrequency": 569546676, "weightDenominator": 19933230517200,
+  "royalMeanNumerator": 54120013354, "royalMeanDenominator": 47462223,
+  "optimalReturnNumerator": 101, "optimalReturnDenominator": 100,
+  "classificationFingerprint": 2074946505
+}
