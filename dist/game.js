@@ -84,6 +84,19 @@
     } finally { writing = false; }
   }
   function deck() {
+    const requested = window.SilverSpurAcademyNextDeal;
+    if (requested && requested.variant === state.variant &&
+        Array.isArray(requested.cards) && requested.cards.length === 5 &&
+        validCards(requested.cards, []) && new Set(requested.cards).size === 5) {
+      delete window.SilverSpurAcademyNextDeal;
+      const cards = Array.from({length:52}, (_, i) => i)
+        .filter(id => !requested.cards.includes(id));
+      for (let i=0; i<5; i++) {
+        const j = i + poker.randomBelow(cards.length-i);
+        [cards[i], cards[j]] = [cards[j], cards[i]];
+      }
+      return requested.cards.concat(cards.slice(0,5));
+    }
     const cards = Array.from({length:52}, (_, i) => i);
     for (let i=0; i<10; i++) {
       const j = i + poker.randomBelow(52-i);
