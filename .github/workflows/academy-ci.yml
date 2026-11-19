@@ -1,0 +1,21 @@
+name: Poker Academy smoke test
+on:
+  push:
+    branches: [academy-development]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check dist/game.js
+          node --check dist/academy.js
+          node --check dist/academy-worker.js
+          node --check dist/math/poker-math.js
+      - name: Exact expected-value test
+        run: node --test math/academy-smoke.test.mjs
