@@ -2,6 +2,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const storageKey = 'silver-spur-academy-v1';
+  const customKey = 'silver-spur-academy-custom-paytables-v1';
   const names = {jacks:'Jacks or Better',deuces:'Deuces Wild',doubleDouble:'Double Double Bonus'};
   const format = value => Number(value).toFixed(4);
   const defaults = () => ({mode:'guided',count:0,optimalEV:0,chosenEV:0,totalLoss:0,assisted:0,byVariant:{},mistakes:[]});
@@ -15,8 +16,87 @@
     return defaults();
   }
   let stats = restore(), last = null, running = null, hinted = false;
+  let paytables = readPaytables();
+  let editVariant = null;
   const pending = [];
   const save = () => { try { localStorage.setItem(storageKey,JSON.stringify(stats)); } catch {} };
+  function readPaytables() {
+    try {
+      const tables = JSON.parse(localStorage.getItem(customKey));
+      return tables && typeof tables === 'object' && !Array.isArray(tables) ? tables : {};
+    } catch { return {}; }
+  }
+  function paytableFor(variant) {
+    const custom = paytables[variant], rows = SilverSpurMath.variants[variant].paytable;
+    return custom && Object.keys(custom).length === rows.length &&
+      rows.every(r => Number.isSafeInteger(custom[r.key]) &&
+        custom[r.key] >= 0 && custom[r.key] <= 100000) ? {...custom} : null;
+  }
+  const activeVariant = () => document.querySelector('#gamePicker button[aria-pressed="true"]')?.dataset.variant;
+  function savePaytables() {
+    localStorage.setItem(customKey, JSON.stringify(paytables));
+    window.dispatchEvent(new Event('silver-spur:paytables'));
+  }
+  function openPaytable() {
+    if (stats.mode === 'certification' || $('cards').classList.contains('can-hold')) {
+      $('academyFeedback').textContent =
+        'Finish the current hand and leave certification mode before editing the paytable.';
+      return;
+    }
+    editVariant = activeVariant();
+    const rows = SilverSpurMath.variants[editVariant].paytable;
+    const current = paytableFor(editVariant);
+    const host = $('academyPaytableRows');
+    host.replaceChildren();
+    for (const row of rows) {
+      const label = document.createElement('label');
+      const name = document.createElement('span');
+      name.textContent = row.name;
+      const field = document.createElement('input');
+      field.type = 'number'; field.min = '0'; field.max = '100000';field.step = '1';
+      field.value = String(current ? current[row.key] : row.units);
+      field.dataset.key = row.key;
+      label.append(name,field);host.append(label);
+    }
+    $('academyPaytableMessage').textContent = current ?
+      'Custom paytable active for '+names[editVariant]+'.' :
+      'Original calibrated Silver Spur paytable active.';
+    $('academySettings').showModal();
+  }
+  $('academyPaytable').addEventListener('click',openPaytable);
+  $('academySettingsClose').addEventListener('click',()=>$('academySettings').close());
+  $('academyPaytableSave').addEventListener('click',() => {
+    if ($('cards').classList.contains('can-hold')) {
+      $('academyPaytableMessage').textContent = 'Finish the current hand before changing payouts.';
+      return;
+    }
+    const custom = {};
+    for (const input of $('academyPaytableRows').querySelectorAll('input')) {
+      const raw = input.value.trim();
+      const value = Number(raw);
+      if (!/^\\d+$/.test(raw) || !Number.isSafeInteger(value) || value > 100000) {
+        $('academyPaytableMessage').textContent = 'Every payout must be a whole number from 0 through 100,000.';
+        input.focus(); return;
+      }
+      custom[input.dataset.key] = value;
+    }
+    paytables[editVariant] = custom;
+    try {savePaytables();} catch { $('academyPaytableMessage').textContent = 'Unable to save paytable in this browser.'; return; }
+    $('academySettings').close();
+    $('academyFeedback').textContent = 'Custom payout schedule saved for '+names[editVariant]+
+      '. Hold advice and grade calculations now use this paytable.';
+  });
+  $('academyPaytableRestore').addEventListener('click',() => {
+    if ($('cards').classList.contains('can-hold')) {
+      $('academyPaytableMessage').textContent = 'Finish the current hand before changing payouts.';
+      return;
+    }
+    delete paytables[editVariant];
+    try {savePaytables();} catch { $('academyPaytableMessage').textContent = 'Unable to save paytable in this browser.'; return; }
+    $('academySettings').close();
+    $('academyFeedback').textContent = 'Original 101% calibrated paytable restored for '+names[editVariant]+'.';
+  });
+
   function modeChanged() {
     document.body.classList.toggle('academy-certification',stats.mode === 'certification');
     document.body.classList.toggle('academy-guided',stats.mode === 'guided');
@@ -180,10 +260,10 @@
     }
     worker.onmessage = msg => finish(msg.data.error, msg.data.result);
     worker.onerror = () => finish('The analysis worker failed. Check the browser console.');
-    worker.postMessage({variant:decision.variant,cards:decision.cards,heldMask:decision.heldMask});
+    worker.postMessage({variant:decision.variant,cards:decision.cards,heldMask:decision.heldMask,paytable:decision.paytable});
   }
   window.addEventListener('silver-spur:decision', e => {
-    pending.push({...e.detail, assisted:hinted});
+    pending.push({...e.detail, assisted:hinted, paytable:paytableFor(e.detail.variant)});
     hinted = false;
     processQueue();
   });
