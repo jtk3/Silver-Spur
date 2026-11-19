@@ -30,12 +30,21 @@
       $('academyAccuracy').textContent = 'Hidden';
       $('academyLoss').textContent = 'Hidden';
       $('academyCount').textContent = String(stats.count);
+      $('academyByGame').replaceChildren();
       return;
     }
     $('academyAccuracy').textContent = stats.optimalEV > 0
       ? (100 * stats.chosenEV / stats.optimalEV).toFixed(5) + '%' : '—';
     $('academyLoss').textContent = format(stats.totalLoss);
     $('academyCount').textContent = String(stats.count);
+    const host = $('academyByGame');
+    host.replaceChildren();
+    for (const [key, v] of Object.entries(stats.byVariant)) {
+      const row = document.createElement('p');
+      const ratio = v.optimalEV ? 100*v.chosenEV/v.optimalEV : 100;
+      row.textContent = names[key] + ': ' + v.count + ' hands · ' + ratio.toFixed(5) + '% economic accuracy · ' + format(v.loss) + ' expected credits lost';
+      host.append(row);
+    }
   }
   function cardLabel(card) {
     return ['2','3','4','5','6','7','8','9','10','J','Q','K','A'][Math.floor(card/4)] +
@@ -86,6 +95,24 @@
       showAnalysis(last.result,last.bet,last.assisted);
       $('academyAlternatives').hidden = !$('academyAlternatives').hidden;
     }
+  });
+  $('academyExport').addEventListener('click', () => {
+    if (stats.mode === 'certification') {
+      $('academyFeedback').textContent = 'Finish certification by switching modes before exporting results.';
+      return;
+    }
+    const q = v => '"' + String(v).replaceAll('"','""') + '"';
+    const rows = [['Variant','Decisions','Optimal EV credits','Chosen EV credits','EV loss credits','Economic accuracy percent']];
+    for (const [key, v] of Object.entries(stats.byVariant))
+      rows.push([names[key],v.count,v.optimalEV,v.chosenEV,v.loss,v.optimalEV?100*v.chosenEV/v.optimalEV:100]);
+    rows.push(['TOTAL',stats.count,stats.optimalEV,stats.chosenEV,stats.totalLoss,
+      stats.optimalEV?100*stats.chosenEV/stats.optimalEV:100]);
+    const csv = rows.map(row => row.map(q).join(',')).join('\\r\\n') + '\\r\\n';
+    const url = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    const link = document.createElement('a');
+    link.href=url; link.download='silver-spur-academy-results.csv'; document.body.append(link);
+    link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url),1000);
   });
   $('academyReset').addEventListener('click', () => {
     if (!confirm('Reset Academy grading statistics in this browser? Your Silver Spur game credits are unaffected.')) return;
