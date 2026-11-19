@@ -61,7 +61,38 @@
     } catch { return null; }
   }
   let state = readSaved() || blanks();
-  const activePoker = () => poker.variants[state.variant];
+  const customKey = 'silver-spur-academy-custom-paytables-v1';
+  function readCustom() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(customKey));
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {}
+    return {};
+  }
+  let customTables = readCustom();
+  function customFor(variant) {
+    const candidate = customTables[variant], rows = poker.variants[variant].paytable;
+    if (!candidate || Object.keys(candidate).length !== rows.length ||
+        rows.some(row => !Number.isSafeInteger(candidate[row.key]) ||
+          candidate[row.key] < 0 || candidate[row.key] > 100000)) return null;
+    return candidate;
+  }
+  const activePoker = () => {
+    const base = poker.variants[state.variant], custom = customFor(state.variant);
+    if (!custom) return base;
+    const paytable = base.paytable.map(row => ({...row,units:custom[row.key],maxUnits:custom[row.key]}));
+    return {...base,paytable,
+      payout:(key,bet) => key === 'nothing' ? 0 : custom[key] * bet,
+      bestHold:async cards => {
+        const worker = new Worker('academy-worker.js');
+        return new Promise((resolve,reject) => {
+          worker.onmessage = e => {worker.terminate();e.data.error ? reject(new Error(e.data.error)) :
+            resolve(e.data.result.bestMasks[0]);};
+          worker.onerror = () => {worker.terminate();reject(new Error('Custom strategy unavailable'));};
+          worker.postMessage({variant:state.variant,cards,heldMask:0,paytable:custom});
+        });
+      }};
+  };
   let tallyFrame = 0;
   let busy = false, writing = false, hintRequest = 0, hintSerial = 0, message = '', activeDialog = '';
   function clearHint() {
@@ -153,7 +184,7 @@
     $('gameTitle').textContent = gameInfo[state.variant].name;
     $('gameTitle').classList.toggle('long-title', state.variant === 'doubleDouble');
     document.querySelector('.paytable').dataset.variant = state.variant;
-    $('royalInfoLabel').textContent = state.variant === 'deuces' ? 'Natural royal flush bonus' : 'Royal flush bonus';
+    $('royalInfoLabel').textContent = customFor(state.variant) ? 'Custom paytable details' : state.variant === 'deuces' ? 'Natural royal flush bonus' : 'Royal flush bonus';
     $('pays').replaceChildren();
     payRows.clear();
     for (const row of activePoker().paytable) {
@@ -220,6 +251,9 @@
     $('statusText').textContent = drawMessage();
     $('status').classList.toggle('paid',!busy && state.phase==='complete' && state.win > 0);
     $('payBet').textContent = state.bet+'-credit bet';
+    const custom = Boolean(customFor(state.variant));
+    $('returnInfo').innerHTML = custom ? '<i></i>Custom paytable' : '<i></i>101% RTP';
+    $('returnInfo').setAttribute('aria-label',custom ? 'Custom paytable: theoretical RTP not calculated' : '101% perfect-play return. View details.');
     for (const row of activePoker().paytable) {
       const ref = payRows.get(row.key);
       ref.value.textContent = fmt(row.units*state.bet)+(row.units !== row.maxUnits ? ' / '+fmt(row.maxUnits*state.bet) : '');
@@ -363,6 +397,9 @@
   const statsRow = (label,value) => '<div><dt>'+label+'</dt><dd>'+value+'</dd></div>';
   const returnsText = '<p>In each Silver Spur game, every credit wagered returns <strong>1.01 credits on average</strong> when you choose the best hold on every deal. The calculation covers all 2,598,960 starting hands and all 32 hold choices for each game. Individual sessions can finish ahead or behind.</p>';
   function royalDetails() {
+    if (customFor(state.variant))
+      return '<p>This Academy game uses an integer-valued custom paytable. The royal flush pays '+
+        fmt(customFor(state.variant).royal)+'× your wager, with no fractional bonus. Hold advice is recalculated for this exact paytable. A game-wide theoretical RTP has not yet been solved.</p>';
     const {royalLow, upperNumerator, upperDenominator} = activePoker().calibration;
     const royal = state.variant === 'deuces' ? 'natural royal flush' : 'royal flush';
     const percentage = (100 * Number(upperNumerator) / Number(upperDenominator)).toFixed(3);
@@ -392,11 +429,14 @@
       $('refill').onclick=async()=>{await change(()=>{if(state.credits!==0||canDraw())return false;state.credits=initialCredits;});d.close();message='Credits added. Ready to deal.';render();};
     } else {
       $('dialogTitle').textContent=which==='royal' ? $('royalInfoLabel').textContent : '101% perfect play';
-      body.innerHTML=which==='royal' ? royalDetails()+returnsText : returnsText+royalDetails();
+      body.innerHTML=customFor(state.variant) ? royalDetails() : which==='royal' ? royalDetails()+returnsText : returnsText+royalDetails();
     }
     d.setAttribute('aria-labelledby','dialogTitle'); if (!d.open) d.showModal();
     $('close').focus();
   }
+  window.addEventListener('silver-spur:paytables', () => {
+    customTables = readCustom(); shownVariant = undefined; clearHint(); render();
+  });
   $('betDown').onclick=()=>step(-1); $('betUp').onclick=()=>step(1);
   for (const button of variantButtons) {
     button.addEventListener('click', () => selectGame(button.dataset.variant));
