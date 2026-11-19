@@ -5,7 +5,7 @@
   const customKey = 'silver-spur-academy-custom-paytables-v1';
   const names = {jacks:'Jacks or Better',deuces:'Deuces Wild',doubleDouble:'Double Double Bonus'};
   const format = value => Number(value).toFixed(4);
-  const defaults = () => ({mode:'guided',count:0,optimalEV:0,chosenEV:0,totalLoss:0,assisted:0,byVariant:{},mistakes:[],assessments:[]});
+  const defaults = () => ({mode:'guided',count:0,optimalEV:0,chosenEV:0,totalLoss:0,assisted:0,byVariant:{},mistakes:[],assessments:[],history:[]});
   function restore() {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey));
@@ -116,6 +116,7 @@
       $('academyCount').textContent = String(assessment ? assessment.count : stats.count);
       $('academyByGame').replaceChildren();
       renderAssessments();
+      renderHistory();
       return;
     }
     $('academyAccuracy').textContent = stats.optimalEV > 0
@@ -131,7 +132,64 @@
       host.append(row);
     }
     renderAssessments();
+    renderHistory();
   }
+  function renderHistory() {
+    const host = $('academyHistory');
+    host.replaceChildren();
+    if (stats.mode === 'certification') return;
+    const recent = (stats.history || []).slice(-8).reverse();
+    if (!recent.length) return;
+    const title = document.createElement('strong');
+    title.textContent = 'Recent graded decisions';
+    host.append(title);
+    for (const h of recent) {
+      const line = document.createElement('p');
+      const percent = h.optimalEV > 0 ? 100*h.chosenEV/h.optimalEV : 100;
+      line.textContent = names[h.variant]+' · '+h.cards.map(cardLabel).join(' ') +
+        ' · '+percent.toFixed(3)+'% economic return · loss '+format(h.loss) +
+        ' credits'+(h.assisted ? ' · assisted' : '');
+      host.append(line);
+    }
+  }
+  const scenarios = {
+    jacks:[
+      {title:'Four to a natural royal',cards:[32,36,40,44,1]},
+      {title:'Two aces and low connectors',cards:[48,49,0,5,10]},
+      {title:'Open straight versus high cards',cards:[32,37,42,47,4]},
+      {title:'Four to a wheel straight flush',cards:[0,4,8,12,48]},
+      {title:'Full house already dealt',cards:[48,49,50,44,45]}
+    ],
+    deuces:[
+      {title:'Two wilds and three high cards',cards:[0,36,40,44,1]},
+      {title:'Deuce with suited connected cards',cards:[1,5,9,13,17]},
+      {title:'Three deuces and a pair of aces',cards:[0,1,2,48,49]},
+      {title:'Wild deuce and four to a royal',cards:[0,32,36,40,44]},
+      {title:'One deuce with a natural straight draw',cards:[2,20,24,28,32]}
+    ],
+    doubleDouble:[
+      {title:'Three aces with low kickers',cards:[48,49,50,0,4]},
+      {title:'Low quads with two aces',cards:[0,1,2,48,49]},
+      {title:'Four to a royal versus bonus payouts',cards:[32,36,40,44,1]},
+      {title:'Two pair with special kicker',cards:[48,49,4,5,2]},
+      {title:'Quad aces plus premium kicker',cards:[48,49,50,51,0]}
+    ]
+  };
+  let lessonIndex = 0;
+  $('academyLessons').addEventListener('click', () => {
+    if (assessment) {
+      $('academyFeedback').textContent = 'Scenario drills are unavailable during an assessment.';
+      return;
+    }
+    const variant = activeVariant();
+    const scenariosForGame = scenarios[variant];
+    const scenario = scenariosForGame[lessonIndex++ % scenariosForGame.length];
+    window.SilverSpurAcademyNextDeal = {variant,cards:scenario.cards.slice()};
+    window.SilverSpurAcademyLessonTitle = scenario.title;
+    $('academyFeedback').textContent = 'Strategy scenario queued: '+scenario.title+
+      '. Finish your current hand, then press Deal. Choose your hold before requesting an explanation.';
+  });
+
   function renderAssessments() {
     const host = $('academyAssessmentReport');
     host.replaceChildren();
@@ -271,6 +329,10 @@
       rows.push([names[key],v.count,v.optimalEV,v.chosenEV,v.loss,v.optimalEV?100*v.chosenEV/v.optimalEV:100]);
     rows.push(['TOTAL',stats.count,stats.optimalEV,stats.chosenEV,stats.totalLoss,
       stats.optimalEV?100*stats.chosenEV/stats.optimalEV:100]);
+    rows.push([]);
+    rows.push(['Date','Game','Deal','Held mask','Wager','Optimal EV credits','Chosen EV credits','EV loss credits','Assisted','Mode']);
+    for (const h of (stats.history || [])) rows.push([h.time,names[h.variant],h.cards.join(' '),
+      h.heldMask,h.bet,h.optimalEV,h.chosenEV,h.loss,h.assisted,h.mode]);
     const csv = rows.map(row => row.map(q).join(',')).join('\\r\\n') + '\\r\\n';
     const url = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     const link = document.createElement('a');
@@ -300,13 +362,17 @@
     if (running) { running.terminate(); running = null; }
     pending.length = 0;
     delete window.SilverSpurAcademyNextDeal;
+    delete window.SilverSpurAcademyLessonTitle;
     stats = defaults(); stats.mode = mode; save(); render();
     $('academyFeedback').textContent = 'Training statistics cleared.';
     $('academyAlternatives').hidden = true;
   });
   window.addEventListener('silver-spur:deal', () => {
     hinted = false;
-    if (stats.mode !== 'certification') $('academyFeedback').textContent = 'Choose your hold, then draw. Economic grading follows.';
+    if (stats.mode !== 'certification') $('academyFeedback').textContent = window.SilverSpurAcademyLessonTitle ?
+      'Strategy scenario: '+window.SilverSpurAcademyLessonTitle+'. Choose your hold, then draw.' :
+      'Choose your hold, then draw. Economic grading follows.';
+    delete window.SilverSpurAcademyLessonTitle;
     $('academyAlternatives').hidden = true;
   });
   window.addEventListener('silver-spur:hint', () => { hinted = true; });
@@ -330,6 +396,11 @@
         stats.count++; stats.optimalEV += optimalEV; stats.chosenEV += chosenEV;
         stats.totalLoss += result.loss * bet;
         if (decision.assisted) stats.assisted++;
+        stats.history ||= [];
+        stats.history.push({time:new Date().toISOString(),variant:decision.variant,
+          cards:decision.cards.slice(),heldMask:decision.heldMask,bet,optimalEV,chosenEV,
+          loss:result.loss*bet,assisted:decision.assisted,mode:decision.mode});
+        if (stats.history.length > 500) stats.history.shift();
         if (assessment && decision.assessment === assessment) {
           assessment.count++;assessment.optimalEV += optimalEV;assessment.chosenEV += chosenEV;
           assessment.loss += result.loss*bet;
@@ -355,7 +426,7 @@
     worker.postMessage({variant:decision.variant,cards:decision.cards,heldMask:decision.heldMask,paytable:decision.paytable});
   }
   window.addEventListener('silver-spur:decision', e => {
-    pending.push({...e.detail, assisted:hinted, paytable:paytableFor(e.detail.variant),assessment});
+    pending.push({...e.detail, assisted:hinted, paytable:paytableFor(e.detail.variant),assessment,mode:stats.mode});
     hinted = false;
     processQueue();
   });
