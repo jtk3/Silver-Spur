@@ -16,6 +16,7 @@ function score(cards, variantName) {
   const hand = cards.slice();
   const expectedValues = [];
   for (let mask = 0; mask < 32; mask++) {
+    for (let i = 0; i < 5; i++) hand[i] = cards[i];
     const slots = [];
     for (let i = 0; i < 5; i++) if (!(mask & (1 << i))) slots.push(i);
     let sum = 0, count = 0;
