@@ -18,7 +18,8 @@
   let stats = restore(), last = null, running = null, hinted = false;
   let paytables = readPaytables();
   let editVariant = null;
-  let assessment = null;
+  let assessment = stats.activeAssessment && stats.activeAssessment.count >= 0 &&
+    stats.activeAssessment.count < 100 ? stats.activeAssessment : null;
   const pending = [];
   const save = () => { try { localStorage.setItem(storageKey,JSON.stringify(stats)); } catch {} };
   function readPaytables() {
@@ -164,6 +165,7 @@
     stats.assessments.push(assessment);
     if (stats.assessments.length > 30) stats.assessments.shift();
     assessment = null;
+    delete stats.activeAssessment;
     stats.mode = 'practice';
     save(); modeChanged(); render();
     $('academyFeedback').textContent =
@@ -182,6 +184,7 @@
     assessment = {variant,count:0,optimalEV:0,chosenEV:0,loss:0,assisted:0,
       completed:false,passed:false,started:new Date().toISOString()};
     stats.mode = 'certification';
+    stats.activeAssessment = assessment;
     delete window.SilverSpurAcademyNextDeal;
     save();modeChanged();render();
     $('academyFeedback').textContent = '100-hand assessment started for '+names[variant]+'. Target: 99.9% economic accuracy.';
