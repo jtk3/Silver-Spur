@@ -5,7 +5,7 @@
   const customKey = 'silver-spur-academy-custom-paytables-v1';
   const names = {jacks:'Jacks or Better',deuces:'Deuces Wild',doubleDouble:'Double Double Bonus'};
   const format = value => Number(value).toFixed(4);
-  const defaults = () => ({mode:'guided',count:0,optimalEV:0,chosenEV:0,totalLoss:0,assisted:0,byVariant:{},mistakes:[]});
+  const defaults = () => ({mode:'guided',count:0,optimalEV:0,chosenEV:0,totalLoss:0,assisted:0,byVariant:{},mistakes:[],assessments:[]});
   function restore() {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey));
@@ -18,6 +18,7 @@
   let stats = restore(), last = null, running = null, hinted = false;
   let paytables = readPaytables();
   let editVariant = null;
+  let assessment = null;
   const pending = [];
   const save = () => { try { localStorage.setItem(storageKey,JSON.stringify(stats)); } catch {} };
   function readPaytables() {
@@ -101,16 +102,19 @@
     document.body.classList.toggle('academy-certification',stats.mode === 'certification');
     document.body.classList.toggle('academy-guided',stats.mode === 'guided');
     document.body.classList.toggle('academy-practice',stats.mode === 'practice');
+    window.SilverSpurAcademyCertification = Boolean(assessment);
+    $('academyAssessment').textContent = assessment ? 'End assessment early' : 'Start 100-hand assessment';
     $('academyMode').value = stats.mode;
     if (stats.mode === 'certification') $('academyFeedback').textContent =
-      'Certification mode: assistance is hidden; results remain concealed until you switch modes.';
+      'Certification mode: assistance is hidden. Start a 100-hand assessment to earn a recorded result.';
   }
   function render() {
     if (stats.mode === 'certification') {
       $('academyAccuracy').textContent = 'Hidden';
       $('academyLoss').textContent = 'Hidden';
-      $('academyCount').textContent = String(stats.count);
+      $('academyCount').textContent = String(assessment ? assessment.count : stats.count);
       $('academyByGame').replaceChildren();
+      renderAssessments();
       return;
     }
     $('academyAccuracy').textContent = stats.optimalEV > 0
@@ -125,7 +129,64 @@
       row.textContent = names[key] + ': ' + v.count + ' hands · ' + ratio.toFixed(5) + '% economic accuracy · ' + format(v.loss) + ' expected credits lost';
       host.append(row);
     }
+    renderAssessments();
   }
+  function renderAssessments() {
+    const host = $('academyAssessmentReport');
+    host.replaceChildren();
+    if (assessment) {
+      const p = document.createElement('p');
+      p.textContent = 'Assessment in progress: ' + assessment.count +
+        '/100 graded hands of ' + names[assessment.variant] + '.';
+      host.append(p);
+    }
+    if (stats.mode === 'certification') return;
+    const recent = (stats.assessments || []).slice(-5).reverse();
+    if (recent.length) {
+      const title = document.createElement('strong');
+      title.textContent = 'Recent assessments';
+      host.append(title);
+      for (const session of recent) {
+        const line = document.createElement('p');
+        const pct = session.optimalEV > 0 ? (100*session.chosenEV/session.optimalEV).toFixed(5) : '—';
+        line.textContent = names[session.variant]+' · '+session.count+' decisions · '+pct+
+          '% economic accuracy · '+(session.completed ? session.passed ? 'Passed' : 'Not passed' : 'Incomplete');
+        host.append(line);
+      }
+    }
+  }
+  function finishAssessment() {
+    if (!assessment) return;
+    assessment.completed = assessment.count === 100;
+    assessment.passed = assessment.completed && assessment.optimalEV > 0 &&
+      assessment.chosenEV/assessment.optimalEV >= 0.999 && assessment.assisted === 0;
+    stats.assessments ||= [];
+    stats.assessments.push(assessment);
+    if (stats.assessments.length > 30) stats.assessments.shift();
+    assessment = null;
+    stats.mode = 'practice';
+    save(); modeChanged(); render();
+    $('academyFeedback').textContent =
+      'Assessment finished. Economic accuracy and result are shown below.';
+  }
+  $('academyAssessment').addEventListener('click', () => {
+    if (assessment) {
+      if (!confirm('End the current assessment early? It will be recorded as incomplete.')) return;
+      finishAssessment();return;
+    }
+    if ($('cards').classList.contains('can-hold') || pending.length || running) {
+      $('academyFeedback').textContent = 'Finish the current hand and outstanding analysis before starting an assessment.';
+      return;
+    }
+    const variant = activeVariant();
+    assessment = {variant,count:0,optimalEV:0,chosenEV:0,loss:0,assisted:0,
+      completed:false,passed:false,started:new Date().toISOString()};
+    stats.mode = 'certification';
+    delete window.SilverSpurAcademyNextDeal;
+    save();modeChanged();render();
+    $('academyFeedback').textContent = '100-hand assessment started for '+names[variant]+'. Target: 99.9% economic accuracy.';
+  });
+
   function cardLabel(card) {
     return ['2','3','4','5','6','7','8','9','10','J','Q','K','A'][Math.floor(card/4)] +
       ['♠','♥','♣','♦'][card%4];
@@ -161,6 +222,12 @@
     details.hidden = true;
   }
   $('academyMode').addEventListener('change', e => {
+    if (assessment && e.target.value !== 'certification') {
+      if (!confirm('Leaving certification ends your current assessment as incomplete.')) {
+        e.target.value = 'certification';return;
+      }
+      finishAssessment();return;
+    }
     stats.mode = e.target.value;
     save(); modeChanged(); render();
     if (stats.mode !== 'certification' && last) showAnalysis(last.result,last.bet,last.assisted);
@@ -196,6 +263,7 @@
   });
   $('academyDrill').addEventListener('click', () => {
     const active = document.querySelector('#gamePicker button[aria-pressed="true"]')?.dataset.variant;
+    if (assessment) { $('academyFeedback').textContent = 'Mistake drills are unavailable during assessment.';return; }
     const matches = (stats.mistakes || []).filter(item => item.variant === active && item.loss > 1e-8);
     if (!matches.length) {
       $('academyFeedback').textContent = 'No economically costly mistakes recorded for this game yet.';
@@ -211,6 +279,7 @@
   $('academyReset').addEventListener('click', () => {
     if (!confirm('Reset Academy grading statistics in this browser? Your Silver Spur game credits are unaffected.')) return;
     const mode = stats.mode;
+    assessment = null;
     if (running) { running.terminate(); running = null; }
     pending.length = 0;
     delete window.SilverSpurAcademyNextDeal;
@@ -244,6 +313,11 @@
         stats.count++; stats.optimalEV += optimalEV; stats.chosenEV += chosenEV;
         stats.totalLoss += result.loss * bet;
         if (decision.assisted) stats.assisted++;
+        if (assessment && decision.assessment === assessment) {
+          assessment.count++;assessment.optimalEV += optimalEV;assessment.chosenEV += chosenEV;
+          assessment.loss += result.loss*bet;
+          if (decision.assisted) assessment.assisted++;
+        }
         if (result.loss > 1e-8) {
           stats.mistakes ||= [];
           stats.mistakes.push({variant:decision.variant,cards:decision.cards.slice(),
@@ -252,8 +326,9 @@
         }
         last = {result,bet,assisted:decision.assisted};
         save(); render();
-        if (stats.mode === 'certification') $('academyFeedback').textContent =
-          'Decision '+stats.count+' recorded. Results are concealed during certification.';
+        if (assessment && assessment.count === 100) { finishAssessment(); }
+        else if (stats.mode === 'certification') $('academyFeedback').textContent =
+          'Assessment decision '+(assessment ? assessment.count : stats.count)+' recorded. Results remain concealed.';
         else showAnalysis(result,bet,decision.assisted);
       }
       processQueue();
@@ -263,7 +338,7 @@
     worker.postMessage({variant:decision.variant,cards:decision.cards,heldMask:decision.heldMask,paytable:decision.paytable});
   }
   window.addEventListener('silver-spur:decision', e => {
-    pending.push({...e.detail, assisted:hinted, paytable:paytableFor(e.detail.variant)});
+    pending.push({...e.detail, assisted:hinted, paytable:paytableFor(e.detail.variant),assessment});
     hinted = false;
     processQueue();
   });
