@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const baseURL = new URL('.', document.currentScript.src);
+  const baseURL = new URL('.', typeof document !== 'undefined' ? document.currentScript.src : self.location.href);
   const jacksEntries = [
     ['straightFlush', 'Straight flush', 50],
     ['fourKind', 'Four of a kind', 25],
