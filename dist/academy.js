@@ -14,11 +14,13 @@
     } catch {}
     return defaults();
   }
-  let stats = restore(), last = null, running = null, serial = 0, hinted = false;
+  let stats = restore(), last = null, running = null, hinted = false;
+  const pending = [];
   const save = () => { try { localStorage.setItem(storageKey,JSON.stringify(stats)); } catch {} };
   function modeChanged() {
     document.body.classList.toggle('academy-certification',stats.mode === 'certification');
     document.body.classList.toggle('academy-guided',stats.mode === 'guided');
+    document.body.classList.toggle('academy-practice',stats.mode === 'practice');
     $('academyMode').value = stats.mode;
     if (stats.mode === 'certification') $('academyFeedback').textContent =
       'Certification mode: assistance is hidden; results remain concealed until you switch modes.';
@@ -88,6 +90,8 @@
   $('academyReset').addEventListener('click', () => {
     if (!confirm('Reset Academy grading statistics in this browser? Your Silver Spur game credits are unaffected.')) return;
     const mode = stats.mode;
+    if (running) { running.terminate(); running = null; }
+    pending.length = 0;
     stats = defaults(); stats.mode = mode; save(); render();
     $('academyFeedback').textContent = 'Training statistics cleared.';
     $('academyAlternatives').hidden = true;
@@ -98,41 +102,42 @@
     $('academyAlternatives').hidden = true;
   });
   window.addEventListener('silver-spur:hint', () => { hinted = true; });
-  window.addEventListener('silver-spur:decision', e => {
-    const decision = {...e.detail, assisted:hinted};
-    hinted = false;
-    if (running) running.terminate();
-    const current = ++serial;
+  function processQueue() {
+    if (running || !pending.length) return;
+    const decision = pending.shift();
     const worker = new Worker('academy-worker.js');
     running = worker;
-    if (stats.mode !== 'certification') $('academyFeedback').textContent = 'Calculating exact expected values for all 32 holds…';
-    worker.onmessage = msg => {
-      if (current !== serial) return;
-      worker.terminate(); running = null;
-      if (msg.data.error) {
-        $('academyFeedback').textContent = 'Analysis unavailable: ' + msg.data.error;
-        return;
+    if (stats.mode !== 'certification') $('academyFeedback').textContent =
+      'Calculating exact expected values for all 32 holds…';
+    function finish(error, result) {
+      worker.terminate();
+      if (running === worker) running = null;
+      if (error) {
+        $('academyFeedback').textContent = 'Analysis unavailable: ' + error;
+      } else {
+        const bet = decision.bet, optimalEV = result.best * bet, chosenEV = result.chosen * bet;
+        const v = stats.byVariant[decision.variant] || {count:0,optimalEV:0,chosenEV:0,loss:0};
+        v.count++; v.optimalEV += optimalEV; v.chosenEV += chosenEV; v.loss += result.loss*bet;
+        stats.byVariant[decision.variant] = v;
+        stats.count++; stats.optimalEV += optimalEV; stats.chosenEV += chosenEV;
+        stats.totalLoss += result.loss * bet;
+        if (decision.assisted) stats.assisted++;
+        last = {result,bet,assisted:decision.assisted};
+        save(); render();
+        if (stats.mode === 'certification') $('academyFeedback').textContent =
+          'Decision '+stats.count+' recorded. Results are concealed during certification.';
+        else showAnalysis(result,bet,decision.assisted);
       }
-      const result = msg.data.result, bet = decision.bet;
-      const optimalEV = result.best * bet, chosenEV = result.chosen * bet;
-      const v = stats.byVariant[decision.variant] || {count:0,optimalEV:0,chosenEV:0,loss:0};
-      v.count++; v.optimalEV += optimalEV; v.chosenEV += chosenEV; v.loss += result.loss*bet;
-      stats.byVariant[decision.variant] = v;
-      stats.count++; stats.optimalEV += optimalEV; stats.chosenEV += chosenEV;
-      stats.totalLoss += result.loss * bet;
-      if (decision.assisted) stats.assisted++;
-      last = {result,bet,assisted:decision.assisted};
-      save(); render();
-      if (stats.mode === 'certification') $('academyFeedback').textContent =
-        'Decision '+stats.count+' recorded. Results are concealed during certification.';
-      else showAnalysis(result,bet,decision.assisted);
-    };
-    worker.onerror = () => {
-      if (current !== serial) return;
-      worker.terminate(); running = null;
-      $('academyFeedback').textContent = 'Analysis worker failed. Check the browser console.';
-    };
-    worker.postMessage({id:current,variant:decision.variant,cards:decision.cards,heldMask:decision.heldMask});
+      processQueue();
+    }
+    worker.onmessage = msg => finish(msg.data.error, msg.data.result);
+    worker.onerror = () => finish('The analysis worker failed. Check the browser console.');
+    worker.postMessage({variant:decision.variant,cards:decision.cards,heldMask:decision.heldMask});
+  }
+  window.addEventListener('silver-spur:decision', e => {
+    pending.push({...e.detail, assisted:hinted});
+    hinted = false;
+    processQueue();
   });
   modeChanged(); render();
 })();
