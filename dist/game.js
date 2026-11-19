@@ -173,7 +173,7 @@
       const selected = variant === state.variant;
       const paused = Object.hasOwn(state.pausedHands, variant);
       button.setAttribute('aria-pressed', String(selected));
-      button.setAttribute('aria-disabled', String(busy && !selected));
+      button.setAttribute('aria-disabled', String((busy || window.SilverSpurAcademyCertification) && !selected));
       button.classList.toggle('has-paused-hand', paused);
       button.title = paused ? 'Resume your saved hand' : '';
       if (paused) button.setAttribute('aria-description', 'Saved hand ready to draw');
@@ -261,7 +261,7 @@
     }
   }
   async function selectGame(variant) {
-    if (variant === state.variant || busy) return;
+    if (variant === state.variant || busy || window.SilverSpurAcademyCertification) return;
     if (await change(() => {
       if (variant === state.variant) return false;
       if (canDraw()) {
@@ -416,7 +416,7 @@
         '<li>Press <b>Draw</b> to replace every unheld card from the remaining deck. Your highest paying hand wins. If you switch games before drawing, your hand and wager are saved for when you return.</li></ol>' +
         '<div class="variant-rules"><h3>' + gameInfo[state.variant].name + '</h3><p>' + gameInfo[state.variant].rules + '</p></div>' +
         '<details><summary>Keyboard controls</summary><p>Keys 1 through 5 toggle the cards from left to right. Space deals or draws. Tab and Enter operate individual controls.</p></details>' +
-        '<details><summary>Perfect play and the royal bonus</summary>' + returnsText + royalDetails() + '</details>';
+        '<details><summary>Perfect play and the royal bonus</summary>' + (customFor(state.variant) ? royalDetails() : returnsText + royalDetails()) + '</details>';
     } else if (which === 'session') {
       $('dialogTitle').textContent='Session stats';
       const inPlay = Object.values(state.pausedHands)
