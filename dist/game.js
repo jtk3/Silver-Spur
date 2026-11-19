@@ -1,9 +1,9 @@
 'use strict';
 (() => {
   const poker = SilverSpurMath, $ = id => document.getElementById(id);
-  const legacyStoreKey = 'silver-spur-game-v1';
-  const previousStoreKey = 'silver-spur-game-v2';
-  const storeKey = 'silver-spur-game-v3';
+  const legacyStoreKey = 'silver-spur-academy-game-lock';
+  const previousStoreKey = 'silver-spur-academy-game-v0';
+  const storeKey = 'silver-spur-academy-game-v1';
   const initialCredits = 1000;
   const gameInfo = {
     jacks: {
