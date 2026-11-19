@@ -199,28 +199,42 @@
     return held.length ? held.join(' ') : 'Draw five';
   }
   function showAnalysis(result, bet, assisted) {
-    const {chosen,best,loss,heldMask,cards,alternatives,bestMasks} = result;
+    const {chosen,best,loss,heldMask,cards,alternatives,bestMasks,selected,optimal} = result;
     const details = $('academyAlternatives');
     details.replaceChildren();
-    const title = document.createElement('p');
-    title.textContent = 'Recommended holds (expected credits per wagered credit):';
-    details.append(title);
+    const top = document.createElement('p');
+    top.textContent = 'All 32 holds ranked by expected payout, per credit wagered. ' +
+      'The selection marked YOUR HOLD is the one you played.';
+    details.append(top);
     const list = document.createElement('ol');
     for (const choice of alternatives) {
       const line = document.createElement('li');
-      line.textContent = maskLabel(choice.mask,cards) + ' — ' + format(choice.value);
-      if (choice.mask === heldMask) line.textContent += ' (your selection)';
+      line.textContent = maskLabel(choice.mask,cards) + ' — EV ' + format(choice.value) +
+        ' · win probability ' + (100*choice.winChance).toFixed(2) + '%';
+      if (choice.mask === heldMask) line.textContent += ' · YOUR HOLD';
+      if (bestMasks.includes(choice.mask)) line.textContent += ' · OPTIMAL';
       list.append(line);
     }
     details.append(list);
+    const difference = document.createElement('p');
+    difference.textContent = 'Your hold wins something on ' +
+      (100*selected.winChance).toFixed(2) + '% of possible draws, with outcome standard deviation ' +
+      Math.sqrt(selected.variance).toFixed(3) + ' credits per credit bet. The optimal hold has a ' +
+      (100*optimal.winChance).toFixed(2) + '% win probability and standard deviation ' +
+      Math.sqrt(optimal.variance).toFixed(3) + '. Probability of a win is not the same as economic return.';
+    details.append(difference);
     const note = document.createElement('p');
-    note.textContent = 'Expected values include the fractional royal bonus. Multiple holds can tie for optimal value.';
+    note.textContent = result.customPaytable ?
+      'Values use your custom integer paytable; no royal bonus is applied.' :
+      'Expected values include the original fractional royal bonus. Multiple optimal holds can tie.';
     details.append(note);
     const perfect = loss < 1e-9;
     const verb = assisted ? 'Assisted' : perfect ? 'Optimal' : 'Below optimal';
+    const pct = best > 0 ? 100*loss/best : 0;
     $('academyFeedback').textContent = verb + ' decision · Your hold: ' +
       format(chosen*bet) + ' expected credits · Best: ' + format(best*bet) +
-      ' · Expected loss: ' + format(loss*bet) + ' credits.' +
+      ' · Expected loss: ' + format(loss*bet) + ' credits (' +
+      pct.toFixed(4) + '% of optimal hand EV).' +
       (bestMasks.length > 1 ? ' Multiple optimal holds.' : '');
     details.hidden = true;
   }
