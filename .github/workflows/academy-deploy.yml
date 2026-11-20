@@ -28,8 +28,6 @@ jobs:
           test -f dist/math/holds.bin
       - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - name: Upload static Academy site
         uses: actions/upload-pages-artifact@v3
         with:
