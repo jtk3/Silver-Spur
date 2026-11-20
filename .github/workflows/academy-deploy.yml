@@ -1,0 +1,37 @@
+name: Deploy Silver Spur Poker Academy
+on:
+  push:
+    branches: [academy-development]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: academy-pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Academy
+        uses: actions/checkout@v4
+      - name: Verify application entry point
+        run: |
+          test -f dist/index.html
+          test -f dist/academy.js
+          test -f dist/academy-worker.js
+          test -f dist/math/poker-math.js
+          test -f dist/math/holds.bin
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload static Academy site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
